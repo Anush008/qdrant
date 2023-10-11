@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::num::NonZeroU32;
@@ -9,8 +9,10 @@ use atomicwrites::OverwriteBehavior::AllowOverwrite;
 use schemars::JsonSchema;
 use segment::common::anonymize::Anonymize;
 use segment::data_types::vectors::DEFAULT_VECTOR_NAME;
+use segment::index::sparse_index::sparse_index_config::SparseIndexConfig;
 use segment::types::{
-    Distance, HnswConfig, Indexes, QuantizationConfig, VectorDataConfig, VectorStorageType,
+    Distance, HnswConfig, Indexes, QuantizationConfig, SparseVectorDataConfig,
+    SparseVectorStorageType, VectorDataConfig, VectorStorageType,
 };
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -18,8 +20,8 @@ use wal::WalOptions;
 
 use crate::operations::config_diff::{DiffConfig, QuantizationConfigDiff};
 use crate::operations::types::{
-    CollectionError, CollectionResult, VectorParams, VectorParamsDiff, VectorsConfig,
-    VectorsConfigDiff,
+    CollectionError, CollectionResult, SparseVectorParams, VectorParams, VectorParamsDiff,
+    VectorsConfig, VectorsConfigDiff,
 };
 use crate::operations::validation;
 use crate::optimizers_builder::OptimizersConfig;
@@ -97,6 +99,10 @@ pub struct CollectionParams {
     /// Note: those payload values that are involved in filtering and are indexed - remain in RAM.
     #[serde(default = "default_on_disk_payload")]
     pub on_disk_payload: bool,
+    /// Configuration of the sparse vector storage
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[validate]
+    pub sparse_vectors: Option<BTreeMap<String, SparseVectorParams>>,
 }
 
 impl Anonymize for CollectionParams {
@@ -109,6 +115,7 @@ impl Anonymize for CollectionParams {
             write_consistency_factor: self.write_consistency_factor,
             read_fan_out_factor: self.read_fan_out_factor,
             on_disk_payload: self.on_disk_payload,
+            sparse_vectors: self.sparse_vectors.anonymize(),
         }
     }
 }
@@ -185,24 +192,63 @@ impl CollectionParams {
             write_consistency_factor: default_write_consistency_factor(),
             read_fan_out_factor: None,
             on_disk_payload: default_on_disk_payload(),
+            sparse_vectors: None,
         }
     }
 
     pub fn get_distance(&self, vector_name: &str) -> CollectionResult<Distance> {
         match self.vectors.get_params(vector_name) {
             Some(params) => Ok(params.distance),
-            None => Err(CollectionError::BadInput {
-                description: format!(
-                    "Vector params for {vector_name} are not specified in config",
-                    vector_name = vector_name
-                ),
-            }),
+            None => {
+                if let Some(sparse_vectors) = &self.sparse_vectors {
+                    sparse_vectors
+                        .get(vector_name)
+                        .ok_or_else(|| CollectionError::BadInput {
+                            description: format!(
+                                "Vector params for {vector_name} are not specified in config",
+                                vector_name = vector_name
+                            ),
+                        })
+                        .map(|_params| Distance::Dot)
+                } else {
+                    Err(CollectionError::BadInput {
+                        description: format!(
+                            "Vector params for {vector_name} are not specified in config",
+                            vector_name = vector_name
+                        ),
+                    })
+                }
+            }
         }
     }
 
     fn get_vector_params_mut(&mut self, vector_name: &str) -> CollectionResult<&mut VectorParams> {
         self.vectors
             .get_params_mut(vector_name)
+            .ok_or_else(|| CollectionError::BadInput {
+                description: if vector_name == DEFAULT_VECTOR_NAME {
+                    "Default vector params are not specified in config".into()
+                } else {
+                    format!("Vector params for {vector_name} are not specified in config")
+                },
+            })
+    }
+
+    pub fn get_sparse_vector_params(
+        &self,
+        vector_name: &str,
+    ) -> CollectionResult<SparseVectorParams> {
+        self.sparse_vectors
+            .as_ref()
+            .ok_or_else(|| CollectionError::BadInput {
+                description: if vector_name == DEFAULT_VECTOR_NAME {
+                    "Default vector params are not specified in config".into()
+                } else {
+                    format!("Vector params for {vector_name} are not specified in config")
+                },
+            })?
+            .get(vector_name)
+            .cloned()
             .ok_or_else(|| CollectionError::BadInput {
                 description: if vector_name == DEFAULT_VECTOR_NAME {
                     "Default vector params are not specified in config".into()
@@ -219,7 +265,6 @@ impl CollectionParams {
     ) -> CollectionResult<()> {
         for (vector_name, update_params) in update_vectors_diff.0.iter() {
             let vector_params = self.get_vector_params_mut(vector_name)?;
-
             let VectorParamsDiff {
                 hnsw_config,
                 quantization_config,
@@ -284,5 +329,36 @@ impl CollectionParams {
                 )
             })
             .collect())
+    }
+
+    /// Convert into unoptimized named vector data configs
+    ///
+    /// It is the job of the segment optimizer to change this configuration with optimized settings
+    /// based on threshold configurations.
+    pub fn into_sparse_vector_data(
+        &self,
+    ) -> CollectionResult<HashMap<String, SparseVectorDataConfig>> {
+        if let Some(sparse_vectors) = &self.sparse_vectors {
+            Ok(sparse_vectors
+                .iter()
+                .map(|(name, _params)| {
+                    (
+                        name.into(),
+                        SparseVectorDataConfig {
+                            storage_type: SparseVectorStorageType::Memory,
+                            index: SparseIndexConfig {
+                                full_scan_threshold: _params
+                                    .index
+                                    .and_then(|index| index.full_scan_threshold)
+                                    .unwrap_or_default(),
+                                on_disk: None,
+                            },
+                        },
+                    )
+                })
+                .collect())
+        } else {
+            Ok(Default::default())
+        }
     }
 }

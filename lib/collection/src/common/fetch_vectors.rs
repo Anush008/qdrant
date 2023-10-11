@@ -238,6 +238,7 @@ pub fn convert_to_vectors_owned(
                 let rec = all_vectors_records_map.get(&collection_name, vid).unwrap();
                 rec.get_vector_by_name(vector_name).map(|v| v.to_owned())
             }
+            RecommendExample::Sparse(vector) => Some(vector.into()),
         })
         .collect()
 }
@@ -254,6 +255,7 @@ pub fn convert_to_vectors<'a>(
             let rec = all_vectors_records_map.get(&collection_name, *vid).unwrap();
             rec.get_vector_by_name(vector_name)
         }
+        RecommendExample::Sparse(vector) => Some(vector.into()),
     })
 }
 

@@ -306,7 +306,7 @@ fn test_score_quantized_points(storage: Arc<AtomicRefCell<VectorStorageEnum>>) {
     let quantized_vectors =
         QuantizedVectors::create(&borrowed_storage, &config, dir.path(), 1, &stopped).unwrap();
 
-    let query: QueryVector = vec![0.5, 0.5, 0.5, 0.5].into();
+    let query: QueryVector = vec![0.5, 0.5, 0.5, 0.5].as_slice().into();
 
     {
         let borrowed_quantized_vectors = quantized_vectors.borrow();

@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use common::types::{ScoreType, ScoredPointOffset};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use segment::data_types::vectors::{only_default_vector, QueryVector, DEFAULT_VECTOR_NAME};
+use segment::data_types::vectors::{only_default_vector, QueryVector, Vector, DEFAULT_VECTOR_NAME};
 use segment::entry::entry_point::SegmentEntry;
 use segment::fixtures::payload_fixtures::{random_vector, STR_KEY};
 use segment::index::hnsw_index::graph_links::GraphLinksRam;
@@ -64,6 +64,7 @@ fn hnsw_quantized_search_test(
                 quantization_config: None,
             },
         )]),
+        sparse_vector_data: Default::default(),
         payload_storage_type: Default::default(),
     };
 
@@ -131,7 +132,10 @@ fn hnsw_quantized_search_test(
     hnsw_index.build_index(&stopped).unwrap();
 
     let query_vectors = (0..attempts)
-        .map(|_| random_vector(&mut rnd, dim).into())
+        .map(|_| {
+            let v: Vector = random_vector(&mut rnd, dim).into();
+            v.into()
+        })
         .collect::<Vec<_>>();
     let filter = Filter::new_must(Condition::Field(FieldCondition::new_match(
         STR_KEY,

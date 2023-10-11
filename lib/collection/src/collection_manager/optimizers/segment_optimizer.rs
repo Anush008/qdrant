@@ -16,7 +16,8 @@ use segment::segment_constructor::build_segment;
 use segment::segment_constructor::segment_builder::SegmentBuilder;
 use segment::types::{
     HnswConfig, Indexes, PayloadFieldSchema, PayloadKeyType, PayloadStorageType, PointIdType,
-    QuantizationConfig, SegmentConfig, VectorStorageType, VECTOR_ELEMENT_SIZE,
+    QuantizationConfig, SegmentConfig, SparseVectorStorageType, VectorStorageType,
+    VECTOR_ELEMENT_SIZE,
 };
 
 use crate::collection_manager::holders::proxy_segment::ProxySegment;
@@ -82,6 +83,7 @@ pub trait SegmentOptimizer {
         let collection_params = self.collection_params();
         let config = SegmentConfig {
             vector_data: collection_params.into_base_vector_data()?,
+            sparse_vector_data: collection_params.into_sparse_vector_data()?,
             payload_storage_type: if collection_params.on_disk_payload {
                 PayloadStorageType::OnDisk
             } else {
@@ -154,6 +156,7 @@ pub trait SegmentOptimizer {
             >= thresholds.memmap_threshold.saturating_mul(BYTES_IN_KB);
 
         let mut vector_data = collection_params.into_base_vector_data()?;
+        let mut sparse_vector_data = collection_params.into_sparse_vector_data()?;
 
         // If indexing, change to HNSW index and quantization
         if is_indexed {
@@ -187,10 +190,14 @@ pub trait SegmentOptimizer {
             vector_data.values_mut().for_each(|config| {
                 config.storage_type = VectorStorageType::Mmap;
             });
+            sparse_vector_data.values_mut().for_each(|config| {
+                config.storage_type = SparseVectorStorageType::Mmap;
+            });
         }
 
         let optimized_config = SegmentConfig {
             vector_data,
+            sparse_vector_data,
             payload_storage_type: if collection_params.on_disk_payload {
                 PayloadStorageType::OnDisk
             } else {

@@ -27,6 +27,7 @@ use crate::common::utils::{
 };
 use crate::data_types::text_index::TextIndexParams;
 use crate::data_types::vectors::{VectorElementType, VectorStruct, VectorType};
+use crate::index::sparse_index::sparse_index_config::SparseIndexConfig;
 use crate::spaces::metric::Metric;
 use crate::spaces::simple::{CosineMetric, DotProductMetric, EuclidMetric};
 
@@ -610,7 +611,12 @@ impl PayloadStorageType {
 #[derive(Default, Debug, Deserialize, Serialize, JsonSchema, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct SegmentConfig {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub vector_data: HashMap<String, VectorDataConfig>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub sparse_vector_data: HashMap<String, SparseVectorDataConfig>,
     /// Defines payload storage type
     pub payload_storage_type: PayloadStorageType,
 }
@@ -637,12 +643,20 @@ impl SegmentConfig {
         self.vector_data
             .values()
             .any(|config| config.index.is_indexed())
+            || self
+                .sparse_vector_data
+                .values()
+                .any(|config| config.is_indexed())
     }
 
     pub fn are_all_vectors_indexed(&self) -> bool {
         self.vector_data
             .values()
             .all(|config| config.index.is_indexed())
+            && self
+                .sparse_vector_data
+                .values()
+                .all(|config| config.is_indexed())
     }
 
     /// Check if any vector storage is on-disk
@@ -650,6 +664,10 @@ impl SegmentConfig {
         self.vector_data
             .values()
             .any(|config| config.storage_type.is_on_disk())
+            || self
+                .sparse_vector_data
+                .values()
+                .any(|config| config.storage_type.is_on_disk())
     }
 }
 
@@ -677,6 +695,30 @@ impl VectorStorageType {
         match self {
             Self::Memory => false,
             Self::Mmap | Self::ChunkedMmap => true,
+        }
+    }
+}
+
+/// Storage types for sparse vectors
+#[derive(Default, Debug, Deserialize, Serialize, JsonSchema, Eq, PartialEq, Copy, Clone)]
+pub enum SparseVectorStorageType {
+    /// Storage in memory (RAM)
+    ///
+    /// Will be very fast at the cost of consuming a lot of memory.
+    #[default]
+    Memory,
+    /// Storage in mmap file, not appendable
+    ///
+    /// Search performance is defined by disk speed and the fraction of vectors that fit in memory.
+    Mmap,
+}
+
+impl SparseVectorStorageType {
+    /// Whether this storage type is a mmap on disk
+    pub fn is_on_disk(&self) -> bool {
+        match self {
+            Self::Memory => false,
+            Self::Mmap => true,
         }
     }
 }
@@ -712,6 +754,29 @@ impl VectorDataConfig {
             VectorStorageType::ChunkedMmap => true,
         };
         is_index_appendable && is_storage_appendable
+    }
+}
+
+/// Config of single vector data storage
+#[derive(Debug, Deserialize, Serialize, JsonSchema, Clone, Validate)]
+#[serde(rename_all = "snake_case")]
+pub struct SparseVectorDataConfig {
+    /// Type of storage this vector uses
+    pub storage_type: SparseVectorStorageType,
+    /// Type of index used for search
+    pub index: SparseIndexConfig,
+}
+
+impl SparseVectorDataConfig {
+    pub fn is_appendable(&self) -> bool {
+        match self.storage_type {
+            SparseVectorStorageType::Memory => true,
+            SparseVectorStorageType::Mmap => false,
+        }
+    }
+
+    pub fn is_indexed(&self) -> bool {
+        true
     }
 }
 

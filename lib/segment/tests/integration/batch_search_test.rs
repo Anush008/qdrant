@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 
 use rand::prelude::StdRng;
 use rand::SeedableRng;
-use segment::data_types::vectors::{only_default_vector, DEFAULT_VECTOR_NAME};
+use segment::data_types::vectors::{only_default_vector, QueryVector, Vector, DEFAULT_VECTOR_NAME};
 use segment::entry::entry_point::SegmentEntry;
 use segment::fixtures::index_fixtures::random_vector;
 use segment::fixtures::payload_fixtures::random_int_payload;
@@ -40,6 +40,7 @@ fn test_batch_and_single_request_equivalency() {
                 quantization_config: None,
             },
         )]),
+        sparse_vector_data: Default::default(),
         payload_storage_type: Default::default(),
     };
 
@@ -67,8 +68,10 @@ fn test_batch_and_single_request_equivalency() {
     }
 
     for _ in 0..10 {
-        let query_vector_1 = random_vector(&mut rnd, dim).into();
-        let query_vector_2 = random_vector(&mut rnd, dim).into();
+        let query_vector_1: Vector = random_vector(&mut rnd, dim).into();
+        let query_vector_1: QueryVector = query_vector_1.into();
+        let query_vector_2: Vector = random_vector(&mut rnd, dim).into();
+        let query_vector_2: QueryVector = query_vector_2.into();
 
         let payload_value = random_int_payload(&mut rnd, 1..=1).pop().unwrap();
 
@@ -154,8 +157,10 @@ fn test_batch_and_single_request_equivalency() {
     hnsw_index.build_index(&stopped).unwrap();
 
     for _ in 0..10 {
-        let query_vector_1 = random_vector(&mut rnd, dim).into();
-        let query_vector_2 = random_vector(&mut rnd, dim).into();
+        let query_vector_1: Vector = random_vector(&mut rnd, dim).into();
+        let query_vector_1: QueryVector = query_vector_1.into();
+        let query_vector_2: Vector = random_vector(&mut rnd, dim).into();
+        let query_vector_2: QueryVector = query_vector_2.into();
 
         let payload_value = random_int_payload(&mut rnd, 1..=1).pop().unwrap();
 

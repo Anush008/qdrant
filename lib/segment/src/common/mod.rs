@@ -18,7 +18,7 @@ use sparse::common::sparse_vector::SparseVector;
 use crate::common::operation_error::{OperationError, OperationResult};
 use crate::data_types::named_vectors::NamedVectors;
 use crate::data_types::vectors::{QueryVector, VectorElementType, VectorRef};
-use crate::types::{SegmentConfig, VectorDataConfig};
+use crate::types::{SegmentConfig, SparseVectorDataConfig, VectorDataConfig};
 
 pub type Flusher = Box<dyn FnOnce() -> OperationResult<()> + Send>;
 
@@ -26,7 +26,11 @@ pub type Flusher = Box<dyn FnOnce() -> OperationResult<()> + Send>;
 ///
 /// Returns an error if incompatible.
 pub fn check_vector_name(vector_name: &str, segment_config: &SegmentConfig) -> OperationResult<()> {
-    get_vector_config_or_error(vector_name, segment_config)?;
+    // TODO(sparse) it's a wrong error check. I use the fact,
+    // that get_vector_config_or_error can return only one type of error - VectorNameNotExists
+    if get_vector_config_or_error(vector_name, segment_config).is_err() {
+        get_sparse_vector_config_or_error(vector_name, segment_config)?;
+    }
     Ok(())
 }
 
@@ -111,7 +115,22 @@ fn get_vector_config_or_error<'a>(
         })
 }
 
-/// Check if the given vector data is compatible with the given configuration.
+/// Get the sparse vector config for the given name, or return a name error.
+///
+/// Returns an error if incompatible.
+fn get_sparse_vector_config_or_error<'a>(
+    vector_name: &str,
+    segment_config: &'a SegmentConfig,
+) -> OperationResult<&'a SparseVectorDataConfig> {
+    segment_config
+        .sparse_vector_data
+        .get(vector_name)
+        .ok_or_else(|| OperationError::VectorNameNotExists {
+            received_name: vector_name.into(),
+        })
+}
+
+/// Check if the given dense vector data is compatible with the given configuration.
 ///
 /// Returns an error if incompatible.
 fn check_vector_against_config(

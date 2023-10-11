@@ -186,7 +186,7 @@ impl<'a> TryInto<&'a SparseVector> for &'a Vector {
     }
 }
 
-pub fn default_vector(vec: Vec<VectorElementType>) -> NamedVectors<'static> {
+pub fn default_vector(vec: VectorType) -> NamedVectors<'static> {
     NamedVectors::from([(DEFAULT_VECTOR_NAME.to_owned(), vec)])
 }
 
@@ -268,9 +268,9 @@ pub struct NamedVector {
 #[derive(Debug, Deserialize, Serialize, JsonSchema, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct NamedSparseVector {
-    /// Name of vector data
+    /// Name of sparse vector data
     pub name: String,
-    /// Vector data
+    /// Sparse vector data
     pub vector: SparseVector,
 }
 

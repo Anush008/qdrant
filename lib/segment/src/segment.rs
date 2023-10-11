@@ -1612,6 +1612,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
         let mut segment = build_segment(dir.path(), &config, true).unwrap();
@@ -1684,6 +1685,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
 
@@ -1775,6 +1777,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
 
@@ -1866,6 +1869,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
 
@@ -1897,6 +1901,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
         let mut segment = build_segment(dir.path(), &config, true).unwrap();
@@ -1991,6 +1996,7 @@ mod tests {
                     quantization_config: None,
                 },
             )]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
         let mut segment = build_segment(dir.path(), &config, true).unwrap();
@@ -2054,6 +2060,7 @@ mod tests {
                     },
                 ),
             ]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
         let mut segment = build_segment(dir.path(), &config, true).unwrap();
@@ -2159,6 +2166,7 @@ mod tests {
                     },
                 ),
             ]),
+            sparse_vector_data: Default::default(),
             payload_storage_type: Default::default(),
         };
         let mut segment = build_segment(dir.path(), &config, true).unwrap();
@@ -2221,7 +2229,8 @@ mod tests {
         let wrong_names = vec!["aa", "bb", ""];
 
         for (vector_name, vector) in wrong_vectors_single.iter() {
-            let query_vector = vector.to_owned().into();
+            let vector: Vector = vector.to_owned().into();
+            let query_vector = vector.into();
             check_vector(vector_name, &query_vector, &config)
                 .err()
                 .unwrap();

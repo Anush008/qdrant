@@ -605,6 +605,7 @@ impl TryFrom<api::grpc::qdrant::CollectionConfig> for CollectionConfig {
                             ),
                         },
                     },
+                    sparse_vectors: None, // TODO(sparse) grpc
                     shard_number: NonZeroU32::new(params.shard_number)
                         .ok_or_else(|| Status::invalid_argument("`shard_number` cannot be zero"))?,
                     on_disk_payload: params.on_disk_payload,
@@ -918,11 +919,14 @@ impl From<QueryEnum> for api::grpc::qdrant::QueryEnum {
     // TODO(sparse) grpc conversion remove unwraps
     fn from(value: QueryEnum) -> Self {
         match value {
-            QueryEnum::Nearest(vector) => api::grpc::qdrant::QueryEnum {
-                query: Some(api::grpc::qdrant::query_enum::Query::NearestNeighbors(
-                    vector.to_vector().into(),
-                )),
-            },
+            QueryEnum::Nearest(vector) => {
+                let v: VectorType = vector.to_vector().try_into().unwrap(); // TODO(sparse) grpc
+                api::grpc::qdrant::QueryEnum {
+                    query: Some(api::grpc::qdrant::query_enum::Query::NearestNeighbors(
+                        v.into(),
+                    )),
+                }
+            }
             QueryEnum::RecommendBestScore(named) => api::grpc::qdrant::QueryEnum {
                 query: Some(api::grpc::qdrant::query_enum::Query::RecommendBestScore(
                     api::grpc::qdrant::RecoQuery {
@@ -953,6 +957,7 @@ impl From<QueryEnum> for api::grpc::qdrant::QueryEnum {
                 query: Some(api::grpc::qdrant::query_enum::Query::Discover(
                     api::grpc::qdrant::DiscoveryQuery {
                         target: Some(api::grpc::qdrant::Vector {
+                            // TODO(sparse) grpc wrong conversion
                             data: named.query.target.try_into().unwrap(),
                         }),
                         context: named
@@ -1095,6 +1100,7 @@ impl TryFrom<api::grpc::qdrant::CoreSearchPoints> for CoreSearchRequest {
                     api::grpc::qdrant::query_enum::Query::RecommendBestScore(query) => {
                         QueryEnum::RecommendBestScore(NamedQuery {
                             query: RecoQuery::new(
+                                // TODO(sparse) grpc wrong conversion
                                 query.positives.into_iter().map(|v| v.data.into()).collect(),
                                 query.negatives.into_iter().map(|v| v.data.into()).collect(),
                             ),

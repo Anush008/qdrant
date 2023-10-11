@@ -29,6 +29,7 @@ use segment::vector_storage::query::reco_query::RecoQuery;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Error as JsonError;
+use sparse::common::sparse_vector::SparseVector;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError as OneshotRecvError;
@@ -36,7 +37,7 @@ use tokio::task::JoinError;
 use tonic::codegen::http::uri::InvalidUri;
 use validator::{Validate, ValidationError, ValidationErrors};
 
-use super::config_diff;
+use super::config_diff::{self, SparseIndexConfigDiff};
 use crate::config::{CollectionConfig, CollectionParams};
 use crate::lookup::types::WithLookupInterface;
 use crate::operations::config_diff::{HnswConfigDiff, QuantizationConfigDiff};
@@ -445,6 +446,7 @@ pub struct PointRequestInternal {
 pub enum RecommendExample {
     PointId(PointIdType),
     Vector(VectorType),
+    Sparse(SparseVector),
 }
 
 impl RecommendExample {
@@ -1206,6 +1208,25 @@ impl Anonymize for VectorParams {
     }
 }
 
+/// Params of single sparse vector data storage
+#[derive(Debug, Hash, Deserialize, Serialize, JsonSchema, Validate, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct SparseVectorParams {
+    /// If true, vectors are served from disk, improving RAM usage at the cost of latency
+    /// Default: false
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_disk: Option<bool>,
+    /// Custom params for index. If none - values from collection configuration are used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index: Option<SparseIndexConfigDiff>,
+}
+
+impl Anonymize for SparseVectorParams {
+    fn anonymize(&self) -> Self {
+        self.clone()
+    }
+}
+
 /// Vector params separator for single and multiple vector modes
 /// Single mode:
 ///
@@ -1308,6 +1329,41 @@ impl VectorsConfig {
 
         Ok(())
     }
+}
+
+// TODO: Further unify `check_compatible` and `check_compatible_with_segment_config`?
+pub fn check_sparse_compatible(
+    self_config: &BTreeMap<String, SparseVectorParams>,
+    other_config: &BTreeMap<String, SparseVectorParams>,
+) -> CollectionResult<()> {
+    for (vector_name, _this) in self_config.iter() {
+        let Some(_other) = other_config.get(vector_name) else {
+            return Err(missing_vector_error(vector_name));
+        };
+    }
+
+    Ok(())
+}
+
+pub fn check_sparse_compatible_with_segment_config(
+    self_config: &BTreeMap<String, SparseVectorParams>,
+    other: &HashMap<String, segment::types::SparseVectorDataConfig>,
+    exact: bool,
+) -> CollectionResult<()> {
+    if exact && self_config.len() != other.len() {
+        return Err(incompatible_vectors_error(
+            self_config.keys().map(String::as_str),
+            other.keys().map(String::as_str),
+        ));
+    }
+
+    for (vector_name, _) in self_config.iter() {
+        if other.get(vector_name).is_none() {
+            return Err(missing_vector_error(vector_name));
+        };
+    }
+
+    Ok(())
 }
 
 fn incompatible_vectors_error<'a, 'b>(
