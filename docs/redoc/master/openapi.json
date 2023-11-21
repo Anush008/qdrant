@@ -6350,7 +6350,7 @@
         ],
         "properties": {
           "name": {
-            "description": "Name of vector data",
+            "description": "Name of sparse vector data",
             "type": "string"
           },
           "vector": {
@@ -7885,15 +7885,6 @@
               "type": "array",
               "items": {
                 "$ref": "#/components/schemas/Vector"
-              }
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/SparseVector"
               }
             }
           }
@@ -10642,25 +10633,6 @@
             "items": {
               "$ref": "#/components/schemas/DiscoverRequest"
             }
-          }
-        }
-      },
-      "SparseIndexConfig": {
-        "type": "object",
-        "required": [
-          "full_scan_threshold"
-        ],
-        "properties": {
-          "full_scan_threshold": {
-            "description": "We prefer a full scan search upto (excluding) this number of vectors.\n\nNote: this is number of vectors, not KiloBytes.",
-            "type": "integer",
-            "format": "uint",
-            "minimum": 0
-          },
-          "on_disk": {
-            "description": "Store index on disk. If set to false, the index will be stored in RAM. Default: false",
-            "type": "boolean",
-            "nullable": true
           }
         }
       }
