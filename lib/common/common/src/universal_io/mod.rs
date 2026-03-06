@@ -1,4 +1,4 @@
-mod file_ops;
+pub mod file_ops;
 #[cfg(target_os = "linux")]
 pub mod io_uring;
 mod local_file_ops;
