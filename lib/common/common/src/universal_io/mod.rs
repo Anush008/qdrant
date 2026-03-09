@@ -1,4 +1,3 @@
-pub mod bitslice;
 mod file_ops;
 #[cfg(target_os = "linux")]
 pub mod io_uring;
