@@ -1,3 +1,4 @@
+pub mod disk_cached;
 mod file_ops;
 #[cfg(target_os = "linux")]
 pub mod io_uring;
@@ -52,11 +53,14 @@ pub type Flusher = Box<dyn FnOnce() -> Result<()> + Send>;
 pub type Result<T, E = UniversalIoError> = std::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
+
 pub enum UniversalIoError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Mmap(#[from] crate::mmap::Error),
+    #[error("Bytemuck cast error: {0:?}")]
+    BytemuckCast(bytemuck::PodCastError),
     #[error("Data range {start}..{end} is out of bounds (data size: {data_length} elements)")]
     OutOfBounds {
         start: u64,
@@ -72,6 +76,22 @@ pub enum UniversalIoError {
     /// Source id is not valid for this multi-source storage.
     #[error("Invalid source id {file_index} (num sources: {num_files})")]
     InvalidFileIndex { file_index: usize, num_files: usize },
+    #[error("Resource was not initialized: {description}")]
+    Uninitialized { description: String },
+}
+
+impl From<bytemuck::PodCastError> for UniversalIoError {
+    fn from(err: bytemuck::PodCastError) -> Self {
+        Self::BytemuckCast(err)
+    }
+}
+
+impl UniversalIoError {
+    pub fn uninitialized(description: impl Into<String>) -> Self {
+        Self::Uninitialized {
+            description: description.into(),
+        }
+    }
 }
 
 /// Open a file via universal io, read it as a whole, and deserialize as JSON.
