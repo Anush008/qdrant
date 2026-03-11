@@ -47,6 +47,13 @@ pub struct ElementsRange {
     pub start: ElementOffset,
     pub length: u64,
 }
+
+impl ElementsRange {
+    pub fn new(start: ElementOffset, length: u64) -> Self {
+        Self { start, length }
+    }
+}
+
 pub type Flusher = Box<dyn FnOnce() -> Result<()> + Send>;
 
 pub type Result<T, E = UniversalIoError> = std::result::Result<T, E>;
