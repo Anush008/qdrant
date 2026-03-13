@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
-use bitvec::prelude::BitVec;
+use common::bitvec::BitVec;
 use common::counter::hardware_counter::HardwareCounterCell;
 use common::fs::{atomic_save_json, read_json};
 use common::tar_unpack::tar_unpack_file;
